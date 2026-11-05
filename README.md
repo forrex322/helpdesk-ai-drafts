@@ -6,14 +6,29 @@
 
 ## Розгорнутий сервіс
 
+Railway, демо-режим LLM (без API-ключа).
+
 | Що | Посилання |
 | --- | --- |
-| Інтерфейс оператора | _буде додано після деплою_ |
-| Вебхук | _буде додано після деплою_ |
-| Мок хелпдеску (що отримали клієнти) | _буде додано після деплою_ |
-| База знань | _буде додано після деплою_ |
+| Інтерфейс оператора | https://web-production-527a0.up.railway.app/tickets/ (логін `operator`, пароль `zvitnyk-demo`) |
+| Вебхук | `POST https://web-production-527a0.up.railway.app/webhooks/helpdesk` |
+| Мок хелпдеску (що отримали клієнти) | https://web-production-527a0.up.railway.app/mock-helpdesk/ |
+| База знань | https://web-production-527a0.up.railway.app/kb/ |
+| Health | https://web-production-527a0.up.railway.app/health |
 
-Демо-логін оператора: `operator` / пароль — у змінній `OPERATOR_PASSWORD` (локально `operator`).
+Спробувати:
+
+```bash
+curl -X POST https://web-production-527a0.up.railway.app/webhooks/helpdesk \
+  -H 'Content-Type: application/json' \
+  -d '{"event_id": "evt_try_1", "ticket_id": "T-1", "customer_email": "user@example.com",
+       "message": "Не можу експортувати звіт у PDF",
+       "reply_url": "https://web-production-527a0.up.railway.app/mock-helpdesk/tickets/T-1/replies"}'
+```
+
+Перевірено на розгорнутому сервісі:
+- 100 подій із дублями від симулятора з ноутбука: 152 запити, 0 помилок, затримка вебхука p95 = 0.24 с, max = 0.33 с.
+- Підтверджена відповідь натрапила на «повільну» відповідь мока: збережено, але без відповіді в межах таймауту. Результат: 3 спроби доставки, клієнт отримав **одну** відповідь, мок поглинув **2** дублі.
 
 ## Як це працює
 
@@ -120,6 +135,7 @@ webhook latency, s:       p50 0.039  p95 0.144  max 0.547
 
 | Змінна | За замовчуванням | Що робить |
 | --- | --- | --- |
+| `PROCESS` | `web` | Який процес запускає образ: `web` або `worker` |
 | `ANTHROPIC_API_KEY` | _порожньо_ | Порожній ключ вмикає демо-режим LLM |
 | `LLM_MODEL` | `claude-sonnet-5-5` | Модель Claude |
 | `LLM_RATE_LIMIT_PER_MINUTE` | `60` | Глобальний ліміт викликів LLM |
@@ -158,26 +174,38 @@ python -m venv .venv && .venv/bin/pip install -r requirements/dev.txt
 
 ## Деплой на Railway
 
-Образ один, сервіси два: `web` і `worker`. Конфіги лежать у `railway/web.json` і `railway/worker.json`.
+Образ один, сервісів два. Процес обирає змінна `PROCESS`: `web` (за замовчуванням) або `worker`. Демо розгорнуто так через [Railway CLI](https://docs.railway.com/guides/cli):
 
-1. Створіть проєкт на Railway і додайте **PostgreSQL**.
-2. Додайте сервіс з цього GitHub-репозиторію з назвою `web`. У Settings → Config-as-code вкажіть `railway/web.json` і згенеруйте публічний домен.
-3. Додайте ще один сервіс з того ж репозиторію з назвою `worker` і конфігом `railway/worker.json`.
-4. Змінні для обох сервісів:
-   ```
-   DATABASE_URL=${{Postgres.DATABASE_URL}}
-   SECRET_KEY=<випадковий рядок>
-   PUBLIC_BASE_URL=https://<домен web>
-   SIMULATOR_REPLY_BASE_URL=https://<домен web>
-   ANTHROPIC_API_KEY=<необов'язково>
-   ```
-   Тільки для `web`:
-   ```
-   ALLOWED_HOSTS=<домен web>
-   CSRF_TRUSTED_ORIGINS=https://<домен web>
-   OPERATOR_PASSWORD=<пароль демо-оператора>
-   ```
-5. Перевірка: `curl https://<домен>/health` має повернути `OK`. Навантаження: `python manage.py simulate_webhooks --base-url https://<домен> --reply-base-url https://<домен> --count 100`.
+```bash
+railway login
+railway init --name helpdesk-ai-drafts
+railway add --database postgres
+railway add --service web
+railway add --service worker
+railway domain --service web --port 8080          # → https://<домен>
+
+railway variable set --service web --skip-deploys \
+  'DATABASE_URL=${{Postgres.DATABASE_URL}}' PORT=8080 \
+  PUBLIC_BASE_URL=https://<домен> SIMULATOR_REPLY_BASE_URL=https://<домен> \
+  ALLOWED_HOSTS=<домен> CSRF_TRUSTED_ORIGINS=https://<домен> \
+  OPERATOR_PASSWORD=<пароль> SECRET_KEY=<випадковий рядок>
+railway variable set --service worker --skip-deploys \
+  'DATABASE_URL=${{Postgres.DATABASE_URL}}' PROCESS=worker \
+  PUBLIC_BASE_URL=https://<домен> SECRET_KEY=<той самий рядок>
+# необов'язково для обох: ANTHROPIC_API_KEY=<ключ>
+
+railway up --service web --ci
+railway up --service worker --ci
+```
+
+Міграції запускає `web` під час старту, а `worker` чекає, поки їх буде застосовано.
+
+Перевірка:
+
+```bash
+curl https://<домен>/health          # OK
+DEBUG=1 python manage.py simulate_webhooks --base-url https://<домен> --reply-base-url https://<домен> --count 100
+```
 
 ## Структура
 

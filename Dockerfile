@@ -11,7 +11,7 @@ COPY requirements/ requirements/
 RUN pip install -r requirements/dev.txt
 
 COPY . .
-RUN SECRET_KEY=build python manage.py collectstatic --noinput
 
 EXPOSE 8000
-CMD ["./bin/web"]
+# One image for both processes: PROCESS=web (default) or PROCESS=worker.
+CMD ["sh", "-c", "exec ./bin/${PROCESS:-web}"]
