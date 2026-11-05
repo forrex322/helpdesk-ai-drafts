@@ -48,3 +48,13 @@ class Ticket(models.Model):
 
     def __str__(self):
         return f"{self.helpdesk_ticket_id} ({self.event_id})"
+
+
+class RateLimitHit(models.Model):
+    """One call start recorded by the sliding-window rate limiter (ADR-0003)."""
+
+    bucket = models.CharField(max_length=50)
+    at = models.DateTimeField()
+
+    class Meta:
+        indexes = [models.Index(fields=["bucket", "at"], name="ratelimit_bucket_at_idx")]
