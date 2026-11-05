@@ -51,6 +51,9 @@ class FakeClock:
 
         self.current = self() + timedelta(**delta)
 
+    def sleep(self, seconds):
+        self.advance(seconds=seconds)
+
 
 class FakeDraftWriter:
     """Stands in for the LLM adapter: returns a predictable Draft or fails on demand."""

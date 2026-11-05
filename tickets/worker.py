@@ -8,7 +8,7 @@ so that a worker whose lease expired cannot overwrite the new owner's result.
 
 import logging
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Callable
 
@@ -19,6 +19,7 @@ from knowledge_base.search import search_articles
 
 from .llm import DraftWriter
 from .models import Ticket
+from .rate_limit import SlidingWindowRateLimiter, llm_rate_limiter_from_settings
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ def backoff(attempt):
 class Worker:
     draft_writer: DraftWriter
     now: Callable[[], datetime] = timezone.now
+    rate_limiter: SlidingWindowRateLimiter = field(default_factory=llm_rate_limiter_from_settings)
 
     def run_once(self) -> bool:
         """Process one due Ticket. Returns False when there was nothing to do."""
@@ -75,6 +77,7 @@ class Worker:
     def _draft(self, ticket):
         try:
             articles = search_articles(ticket.message)
+            self.rate_limiter.acquire()
             draft = self.draft_writer.write_draft(ticket.message, articles)
         except Exception as error:
             logger.warning("Drafting %s failed (attempt %s): %r", ticket, ticket.attempts, error)

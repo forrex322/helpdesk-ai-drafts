@@ -4,8 +4,8 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Sliding-window limiter in Postgres with an advisory lock; `acquire()` → go or seconds to wait
-- [ ] Many threads hammering the limiter never exceed the limit in a window
-- [ ] Worker waits for the limiter before every LLM call
+- [x] Sliding-window limiter in Postgres with an advisory lock; `acquire()` → go or seconds to wait
+- [x] Many threads hammering the limiter never exceed the limit in a window
+- [x] Worker waits for the limiter before every LLM call
