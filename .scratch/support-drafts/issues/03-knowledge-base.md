@@ -4,9 +4,9 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Data migration seeds 8 Articles; `pg_trgm` enabled by migration
-- [ ] `/kb/` lists Articles, `/kb/<slug>/` shows one (public, no login)
-- [ ] Search returns at most 3 Articles ranked by relevance, nothing for an unrelated message
-- [ ] Absolute Article links are built from `PUBLIC_BASE_URL`
+- [x] Data migration seeds 8 Articles; `pg_trgm` enabled by migration
+- [x] `/kb/` lists Articles, `/kb/<slug>/` shows one (public, no login)
+- [x] Search returns at most 3 Articles ranked by relevance, nothing for an unrelated message
+- [x] Absolute Article links are built from `PUBLIC_BASE_URL`

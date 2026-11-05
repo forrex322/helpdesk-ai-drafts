@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}База знань · Звітник{% endblock %}
+{% block content %}
+  <h1>База знань Звітника</h1>
+  <form method="get">
+    <input name="q" value="{{ query }}" placeholder="Опишіть проблему" size="60">
+    <button type="submit">Шукати</button>
+    {% if query %}<a href="{% url 'knowledge_base:list' %}">усі статті</a>{% endif %}
+  </form>
+  <ul>
+    {% for article in articles %}
+      <li data-article-slug="{{ article.slug }}">
+        <a href="{{ article.get_absolute_url }}">{{ article.title }}</a>
+        {% if query %}<span class="muted">(релевантність {{ article.score|floatformat:2 }})</span>{% endif %}
+      </li>
+    {% empty %}
+      <li class="muted">Нічого не знайдено.</li>
+    {% endfor %}
+  </ul>
+{% endblock %}

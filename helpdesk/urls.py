@@ -14,6 +14,7 @@ urlpatterns = [
     path('health', health, name='health'),
     path('webhooks/helpdesk', helpdesk_webhook, name='helpdesk-webhook'),
     path('tickets/', include('tickets.urls')),
+    path('kb/', include('knowledge_base.urls')),
     path('', include('django.contrib.auth.urls')),
     path('', RedirectView.as_view(pattern_name='tickets:list', permanent=False)),
     path('admin/', admin.site.urls),
