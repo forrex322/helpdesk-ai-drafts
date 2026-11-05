@@ -4,9 +4,9 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `docker compose up` brings up db, web, worker; web waits for db and runs migrations
-- [ ] `GET /health` → `200`, body `OK`
-- [ ] Settings read SECRET_KEY, DEBUG, ALLOWED_HOSTS, CSRF_TRUSTED_ORIGINS, DATABASE_URL and app settings from env with dev-friendly defaults
-- [ ] pytest + pytest-django configured; a health test passes against Postgres
+- [x] `docker compose up` brings up db, web, worker; web waits for db and runs migrations
+- [x] `GET /health` → `200`, body `OK`
+- [x] Settings read SECRET_KEY, DEBUG, ALLOWED_HOSTS, CSRF_TRUSTED_ORIGINS, DATABASE_URL and app settings from env with dev-friendly defaults
+- [x] pytest + pytest-django configured; a health test passes against Postgres

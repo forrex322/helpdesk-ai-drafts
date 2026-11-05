@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: helpdesk
+      POSTGRES_USER: helpdesk
+      POSTGRES_PASSWORD: helpdesk
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U helpdesk -d helpdesk"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  web:
+    build: .
+    command: ./bin/web
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgres://helpdesk:helpdesk@db:5432/helpdesk
+      PUBLIC_BASE_URL: http://localhost:8000
+      ALLOWED_HOSTS: "*"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: ./bin/worker
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgres://helpdesk:helpdesk@db:5432/helpdesk
+      PUBLIC_BASE_URL: http://localhost:8000
+    depends_on:
+      db:
+        condition: service_healthy
+      web:
+        condition: service_started
+
+volumes:
+  pgdata:

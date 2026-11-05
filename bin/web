@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+python manage.py migrate --noinput
+python manage.py ensure_operator
+exec gunicorn helpdesk.wsgi:application \
+  --bind "0.0.0.0:${PORT:-8000}" \
+  --worker-class gthread \
+  --workers "${WEB_CONCURRENCY:-2}" \
+  --threads "${WEB_THREADS:-16}" \
+  --timeout 60 \
+  --access-logfile -

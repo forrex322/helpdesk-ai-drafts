@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+# The web process owns migrations; wait until they are applied.
+until python manage.py migrate --check >/dev/null 2>&1; do
+  echo "worker: waiting for migrations..."
+  sleep 2
+done
+exec python manage.py run_worker
