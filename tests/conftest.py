@@ -78,7 +78,7 @@ def clock():
 
 
 def ticket_path(event_id="evt_8f2a"):
-    from tickets.models import Ticket
+    from apps.tickets.models import Ticket
 
     return f"/tickets/{Ticket.objects.get(event_id=event_id).pk}"
 
