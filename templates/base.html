@@ -26,6 +26,7 @@
       <a href="{% url 'tickets:list' %}">Звернення</a>
     {% endif %}
     <a href="{% url 'knowledge_base:list' %}">База знань</a>
+    <a href="{% url 'mock_helpdesk:replies' %}">Мок хелпдеску</a>
     {% block nav_extra %}{% endblock %}
     {% if user.is_authenticated %}
       <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button>Вийти ({{ user.username }})</button></form>

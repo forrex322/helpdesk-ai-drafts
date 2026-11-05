@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Мок хелпдеску · Звітник{% endblock %}
+{% block head %}<meta http-equiv="refresh" content="15">{% endblock %}
+{% block content %}
+  <h1>Мок хелпдеску: що отримали клієнти</h1>
+  <p class="muted">
+    Ендпоінт <code>POST /mock-helpdesk/tickets/&lt;ticket_id&gt;/replies</code>.
+    Збої: {{ failure_rate }} частка відповідей 503, {{ slow_rate }} частка «повільних» відповідей ({{ slow_seconds }} с, після збереження).
+  </p>
+  <p>Отримано відповідей: <strong>{{ total }}</strong>. Поглинуто повторних доставок: <strong>{{ duplicates }}</strong>.</p>
+  <table>
+    <thead><tr><th>Тікет</th><th>Відповідь</th><th>Дублі</th><th>Отримано</th></tr></thead>
+    <tbody>
+      {% for reply in replies %}
+        <tr data-ticket-id="{{ reply.ticket_id }}" data-duplicates="{{ reply.duplicate_deliveries }}">
+          <td>{{ reply.ticket_id }}</td>
+          <td><pre>{{ reply.message }}</pre></td>
+          <td>{{ reply.duplicate_deliveries }}</td>
+          <td class="muted">{{ reply.received_at|date:"d.m.Y H:i:s" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="muted">Відповідей ще немає.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

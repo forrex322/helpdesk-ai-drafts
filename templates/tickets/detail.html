@@ -9,6 +9,7 @@
     <tr><th>Отримано</th><td>{{ ticket.created_at|date:"d.m.Y H:i:s" }}</td></tr>
     <tr><th>Подія</th><td class="muted">{{ ticket.event_id }}</td></tr>
     <tr><th>Спроб</th><td>{{ ticket.attempts }}</td></tr>
+    {% if ticket.sent_at %}<tr><th>Надіслано клієнту</th><td>{{ ticket.sent_at|date:"d.m.Y H:i:s" }}</td></tr>{% endif %}
     {% if ticket.last_error %}<tr><th>Остання помилка</th><td class="error">{{ ticket.last_error }}</td></tr>{% endif %}
   </table>
 

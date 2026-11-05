@@ -4,9 +4,9 @@
 
 **Blocked by:** 06
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Worker delivers `approved` Tickets: `201` → `sent` with timestamp; `5xx`/timeout/network error → retry with backoff; other `4xx` → `send_failed`; 8 attempts max
-- [ ] Mock `POST /mock-helpdesk/tickets/<id>/replies` with configurable failure and slow rates; duplicate key → `201`, not stored twice, counter incremented
-- [ ] `/mock-helpdesk/` shows received Replies and duplicate counts
-- [ ] End-to-end test: flaky mock + retries → exactly one stored Reply
+- [x] Worker delivers `approved` Tickets: `201` → `sent` with timestamp; `5xx`/timeout/network error → retry with backoff; other `4xx` → `send_failed`; 8 attempts max
+- [x] Mock `POST /mock-helpdesk/tickets/<id>/replies` with configurable failure and slow rates; duplicate key → `201`, not stored twice, counter incremented
+- [x] `/mock-helpdesk/` shows received Replies and duplicate counts
+- [x] End-to-end test: flaky mock + retries → exactly one stored Reply

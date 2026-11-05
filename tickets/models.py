@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -40,6 +42,10 @@ class Ticket(models.Model):
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
     )
     moderated_at = models.DateTimeField(null=True, blank=True)
+
+    # Sent as `Idempotency-Key` on every Delivery attempt of this Ticket's Reply (ADR-0002).
+    reply_idempotency_key = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    sent_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)

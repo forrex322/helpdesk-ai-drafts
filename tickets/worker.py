@@ -17,6 +17,7 @@ from django.utils import timezone
 
 from knowledge_base.search import search_articles
 
+from .helpdesk import HelpdeskClient, PermanentDeliveryError, RetryableDeliveryError, helpdesk_client_from_settings
 from .llm import DraftWriter
 from .models import Ticket
 from .rate_limit import SlidingWindowRateLimiter, llm_rate_limiter_from_settings
@@ -27,6 +28,7 @@ S = Ticket.Status
 
 LEASE = timedelta(minutes=5)
 DRAFT_MAX_ATTEMPTS = 5
+DELIVERY_MAX_ATTEMPTS = 8
 BACKOFF_BASE = timedelta(seconds=10)
 BACKOFF_MAX = timedelta(minutes=10)
 
@@ -35,6 +37,8 @@ BACKOFF_MAX = timedelta(minutes=10)
 CLAIMABLE = {
     S.NEW: S.DRAFTING,
     S.DRAFTING: S.DRAFTING,
+    S.APPROVED: S.SENDING,
+    S.SENDING: S.SENDING,
 }
 
 
@@ -47,13 +51,17 @@ class Worker:
     draft_writer: DraftWriter
     now: Callable[[], datetime] = timezone.now
     rate_limiter: SlidingWindowRateLimiter = field(default_factory=llm_rate_limiter_from_settings)
+    helpdesk: HelpdeskClient = field(default_factory=helpdesk_client_from_settings)
 
     def run_once(self) -> bool:
         """Process one due Ticket. Returns False when there was nothing to do."""
         ticket = self._claim()
         if ticket is None:
             return False
-        self._draft(ticket)
+        if ticket.status == S.DRAFTING:
+            self._draft(ticket)
+        else:
+            self._deliver(ticket)
         return True
 
     def _claim(self):
@@ -87,6 +95,22 @@ class Worker:
             if self._complete(ticket, status=S.DRAFT_READY, draft=draft, last_error=""):
                 ticket.cited_articles.set(articles)
         logger.info("Drafted %s citing %s", ticket, [article.slug for article in articles])
+
+    def _deliver(self, ticket):
+        try:
+            self.helpdesk.deliver_reply(
+                ticket.reply_url, ticket.helpdesk_ticket_id, ticket.reply, ticket.reply_idempotency_key
+            )
+        except RetryableDeliveryError as error:
+            logger.warning("Delivery of %s failed (attempt %s): %s", ticket, ticket.attempts, error)
+            self._retry_or_fail(ticket, error, DELIVERY_MAX_ATTEMPTS, retry_as=S.APPROVED, fail_as=S.SEND_FAILED)
+            return
+        except PermanentDeliveryError as error:
+            logger.warning("Helpdesk refused the Reply for %s: %s", ticket, error)
+            self._complete(ticket, status=S.SEND_FAILED, last_error=f"{type(error).__name__}: {error}")
+            return
+        self._complete(ticket, status=S.SENT, sent_at=timezone.now(), last_error="")
+        logger.info("Delivered the Reply for %s", ticket)
 
     def _retry_or_fail(self, ticket, error, max_attempts, retry_as, fail_as):
         last_error = f"{type(error).__name__}: {error}"
