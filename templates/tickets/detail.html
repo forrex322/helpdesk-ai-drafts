@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}{{ ticket.helpdesk_ticket_id }} · Звітник{% endblock %}
+{% block content %}
+  <p><a href="{% url 'tickets:list' %}">← Усі звернення</a></p>
+  <h1>Звернення {{ ticket.helpdesk_ticket_id }}</h1>
+  <table>
+    <tr><th>Статус</th><td class="status">{{ ticket.get_status_display }}</td></tr>
+    <tr><th>Клієнт</th><td>{{ ticket.customer_email }}</td></tr>
+    <tr><th>Отримано</th><td>{{ ticket.created_at|date:"d.m.Y H:i:s" }}</td></tr>
+    <tr><th>Подія</th><td class="muted">{{ ticket.event_id }}</td></tr>
+    <tr><th>Спроб</th><td>{{ ticket.attempts }}</td></tr>
+    {% if ticket.last_error %}<tr><th>Остання помилка</th><td class="error">{{ ticket.last_error }}</td></tr>{% endif %}
+  </table>
+
+  <h2>Повідомлення клієнта</h2>
+  <pre>{{ ticket.message }}</pre>
+
+  <h2>Чернетка</h2>
+  {% if llm_stub_mode %}<p class="messages">LLM працює в демо-режимі без API-ключа: запит до провайдера виконується, але чернетка статична.</p>{% endif %}
+  {% if ticket.draft %}
+    <pre>{{ ticket.draft }}</pre>
+  {% else %}
+    <p class="muted">Чернетки ще немає.</p>
+  {% endif %}
+
+  <h2>Знайдені статті</h2>
+  <ul>
+    {% for article in ticket.cited_articles.all %}
+      <li><a href="{{ article.get_absolute_url }}">{{ article.title }}</a> <span class="muted">{{ article.public_url }}</span></li>
+    {% empty %}
+      <li class="muted">Немає.</li>
+    {% endfor %}
+  </ul>
+{% endblock %}

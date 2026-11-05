@@ -34,6 +34,8 @@ services:
   worker:
     build: .
     command: ./bin/worker
+    # Let in-flight LLM calls (up to 30 s) finish on `docker compose stop`.
+    stop_grace_period: 45s
     env_file:
       - path: .env
         required: false
