@@ -4,8 +4,8 @@
 
 **Blocked by:** 08
 
-**Status:** ready-for-human
+**Status:** done
 
-- [ ] GitHub repository `forrex322/helpdesk-ai-drafts` with full history
-- [ ] Railway project: Postgres, web, worker; env vars set
-- [ ] Public webhook URL and Operator UI URL in README; smoke test with the simulator against the deployment
+- [x] GitHub repository `forrex322/helpdesk-ai-drafts` with full history
+- [x] Railway project: Postgres, web, worker; env vars set
+- [x] Public webhook URL and Operator UI URL in README; smoke test with the simulator against the deployment
