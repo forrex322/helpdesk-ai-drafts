@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -21,9 +22,13 @@ def env_list(name, default=""):
     return [item.strip() for item in os.environ.get(name, default).split(",") if item.strip()]
 
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-dev-only-change-me")
-
 DEBUG = env_bool("DEBUG", False)
+
+SECRET_KEY = os.environ.get("SECRET_KEY", "")
+if not SECRET_KEY:
+    if not DEBUG:
+        raise ImproperlyConfigured("Set SECRET_KEY, or DEBUG=1 for a local dev key.")
+    SECRET_KEY = "django-insecure-dev-only"
 
 ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "localhost,127.0.0.1,[::1],web")
 
@@ -36,7 +41,6 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -158,6 +162,7 @@ OPERATOR_PASSWORD = os.environ.get("OPERATOR_PASSWORD", "operator")
 
 # LLM. An empty key switches the adapter to stub mode (see ADR-0003 and the spec).
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+LLM_STUB_MODE = not ANTHROPIC_API_KEY
 LLM_MODEL = os.environ.get("LLM_MODEL", "claude-sonnet-5-5")
 LLM_TIMEOUT_SECONDS = float(os.environ.get("LLM_TIMEOUT_SECONDS", "60"))
 LLM_RATE_LIMIT_PER_MINUTE = int(os.environ.get("LLM_RATE_LIMIT_PER_MINUTE", "60"))

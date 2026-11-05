@@ -14,18 +14,19 @@
     </label>
   </form>
   <table>
-    <thead><tr><th>Тікет</th><th>Клієнт</th><th>Повідомлення</th><th>Статус</th><th>Отримано</th></tr></thead>
+    <thead><tr><th>Тікет</th><th>Клієнт</th><th>Повідомлення</th><th>Чернетка</th><th>Статус</th><th>Отримано</th></tr></thead>
     <tbody>
       {% for ticket in page %}
         <tr data-event-id="{{ ticket.event_id }}">
           <td><a href="{% url 'tickets:detail' ticket.pk %}">{{ ticket.helpdesk_ticket_id }}</a></td>
           <td>{{ ticket.customer_email }}</td>
           <td>{{ ticket.message|truncatechars:120 }}</td>
+          <td class="muted">{{ ticket.reply|default:ticket.draft|truncatechars:160 }}</td>
           <td class="status">{{ ticket.get_status_display }}</td>
           <td class="muted">{{ ticket.created_at|date:"d.m.Y H:i:s" }}</td>
         </tr>
       {% empty %}
-        <tr><td colspan="5" class="muted">Звернень немає.</td></tr>
+        <tr><td colspan="6" class="muted">Звернень немає.</td></tr>
       {% endfor %}
     </tbody>
   </table>

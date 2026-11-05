@@ -8,11 +8,17 @@ class EventForm(forms.Form):
 
     event_id = forms.CharField(max_length=255)
     ticket_id = forms.CharField(max_length=255)
-    customer_email = forms.EmailField(max_length=254)
-    message = forms.CharField()
+    # Lenient on purpose: a Ticket is never lost to a 400 (which the Helpdesk does
+    # not retry) over a field we only display.
+    customer_email = forms.CharField(max_length=254, required=False)
+    message = forms.CharField(strip=False)
     # Plain CharField: Django's URLValidator rejects TLD-less hosts such as
     # the compose service name `web`, which the mock Helpdesk uses.
     reply_url = forms.CharField(max_length=2048)
+
+    def __init__(self, data):
+        # Postgres text cannot hold NUL; dropping it beats rejecting (and so losing) the Ticket.
+        super().__init__({key: value.replace("\x00", "") if isinstance(value, str) else value for key, value in data.items()})
 
     def clean_reply_url(self):
         url = self.cleaned_data["reply_url"]

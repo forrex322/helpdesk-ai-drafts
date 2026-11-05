@@ -1,4 +1,5 @@
 import json
+import random as random_module
 
 import anthropic
 import httpx2
@@ -50,16 +51,7 @@ class FakeTime:
         self.now += seconds
 
 
-class FixedRandom:
-    def __init__(self, value):
-        self.value = value
-
-    def uniform(self, low, high):
-        assert (low, high) == (5, 30)
-        return self.value
-
-
-def make_writer(api, api_key="sk-test", time=None, random=None):
+def make_writer(api, api_key="sk-test", time=None, random=random_module.Random(0)):
     time = time or FakeTime()
     return AnthropicDraftWriter(
         api_key=api_key,
@@ -68,7 +60,7 @@ def make_writer(api, api_key="sk-test", time=None, random=None):
         http_client=anthropic.DefaultHttpxClient(transport=httpx2.MockTransport(api)),
         sleep=time.sleep,
         monotonic=time.monotonic,
-        random=random or FixedRandom(12.0),
+        random=random,
     )
 
 
@@ -79,11 +71,20 @@ def pdf_article(db, settings):
 
 
 def test_returns_the_models_draft(pdf_article):
+    api = Recorder(body=message_response("Добрий день! Відкрийте звіт... https://zvitnyk.test/kb/export-pdf/"))
+
+    draft = make_writer(api).write_draft("Не можу експортувати звіт у PDF", [pdf_article])
+
+    assert draft == "Добрий день! Відкрийте звіт... https://zvitnyk.test/kb/export-pdf/"
+
+
+def test_draft_always_links_the_cited_articles_even_if_the_model_left_them_out(pdf_article):
     api = Recorder(body=message_response("Добрий день! Відкрийте звіт..."))
 
     draft = make_writer(api).write_draft("Не можу експортувати звіт у PDF", [pdf_article])
 
-    assert draft == "Добрий день! Відкрийте звіт..."
+    assert draft.startswith("Добрий день! Відкрийте звіт...")
+    assert "https://zvitnyk.test/kb/export-pdf/" in draft
 
 
 def test_sends_the_message_and_articles_with_links_to_the_configured_model(pdf_article):
@@ -128,7 +129,8 @@ def test_without_api_key_still_calls_the_provider_then_returns_a_static_draft_wi
     assert "https://zvitnyk.test/kb/export-pdf/" in draft
 
 
-def test_without_api_key_the_call_takes_between_5_and_30_seconds_in_total(pdf_article):
+@pytest.mark.parametrize("seed", range(20))
+def test_without_api_key_the_call_takes_between_5_and_30_seconds_in_total(pdf_article, seed):
     time = FakeTime()
     api = Recorder(status=401, body={"type": "error", "error": {"type": "authentication_error", "message": "no"}})
 
@@ -136,9 +138,10 @@ def test_without_api_key_the_call_takes_between_5_and_30_seconds_in_total(pdf_ar
         time.now += 0.5  # the real round trip
         return api(request)
 
-    make_writer(slow_api, api_key="", time=time, random=FixedRandom(12.0)).write_draft("Питання", [pdf_article])
+    started = time.now
+    make_writer(slow_api, api_key="", time=time, random=random_module.Random(seed)).write_draft("Питання", [pdf_article])
 
-    assert time.slept == [pytest.approx(11.5)]
+    assert 5 <= time.now - started <= 30
 
 
 def test_without_api_key_works_even_if_the_provider_is_unreachable(pdf_article):

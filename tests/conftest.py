@@ -77,7 +77,17 @@ def clock():
     return FakeClock()
 
 
-def ticket_page(operator_client, event_id):
+def ticket_path(event_id="evt_8f2a"):
     from tickets.models import Ticket
 
-    return operator_client.get(f"/tickets/{Ticket.objects.get(event_id=event_id).pk}/").content.decode()
+    return f"/tickets/{Ticket.objects.get(event_id=event_id).pk}"
+
+
+def ticket_page(operator_client, event_id="evt_8f2a"):
+    return operator_client.get(f"{ticket_path(event_id)}/").content.decode()
+
+
+@pytest.fixture
+def reliable_mock_helpdesk(settings):
+    settings.MOCK_HELPDESK_FAILURE_RATE = 0
+    settings.MOCK_HELPDESK_SLOW_RATE = 0

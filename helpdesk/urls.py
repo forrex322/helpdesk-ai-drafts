@@ -1,4 +1,3 @@
-from django.contrib import admin
 from django.http import HttpResponse
 from django.urls import include, path
 from django.views.generic import RedirectView
@@ -18,5 +17,4 @@ urlpatterns = [
     path('mock-helpdesk/', include('mock_helpdesk.urls')),
     path('', include('django.contrib.auth.urls')),
     path('', RedirectView.as_view(pattern_name='tickets:list', permanent=False)),
-    path('admin/', admin.site.urls),
 ]

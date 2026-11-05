@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 # still made (and rejected with 401) exactly like a real call would be.
 STUB_API_KEY = "stub-mode-no-api-key"
 STUB_DURATION_SECONDS = (5, 30)
+# The stub's real request must not stretch the call past the 5–30 s it imitates.
+STUB_REQUEST_TIMEOUT_SECONDS = 5
 
 SYSTEM_PROMPT = """\
 Ти — спеціаліст служби підтримки продукту «Звітник» (SaaS для звітів і дашбордів). \
@@ -58,7 +60,7 @@ class AnthropicDraftWriter:
         self.model = model
         self.client = anthropic.Anthropic(
             api_key=api_key or STUB_API_KEY,
-            timeout=timeout,
+            timeout=STUB_REQUEST_TIMEOUT_SECONDS if self.stub_mode else timeout,
             # Job-level retries own this: SDK retries would bypass the global rate limit.
             max_retries=0,
             http_client=http_client,
@@ -77,7 +79,7 @@ class AnthropicDraftWriter:
             logger.info("Stub mode: provider answered %s; using the static Draft", type(error).__name__)
         else:
             if not self.stub_mode:
-                return self._text_of(response)
+                return with_article_links(self._text_of(response), articles)
         return self._stub_draft(started, articles)
 
     def _request(self, message, articles):
@@ -121,6 +123,16 @@ def render_prompt(message, articles):
     )
 
 
+def article_link(article):
+    return f"Детальніше: {article.title} — {article.public_url}"
+
+
+def with_article_links(draft, articles):
+    """Guarantee every cited Article's link is in the Draft, whatever the model wrote."""
+    missing = [article_link(article) for article in articles if article.public_url not in draft]
+    return "\n\n".join([draft, "\n".join(missing)]) if missing else draft
+
+
 def static_draft(articles):
     if not articles:
         return (
@@ -129,7 +141,7 @@ def static_draft(articles):
             "Якщо можете, опишіть, будь ласка, детальніше, що саме відбувається.\n\n"
             "Команда підтримки Звітника"
         )
-    links = "\n".join(f"Детальніше: {article.title} — {article.public_url}" for article in articles)
+    links = "\n".join(article_link(article) for article in articles)
     return (
         "Добрий день!\n\n"
         "Дякуємо за звернення. Відповідь на ваше питання є в нашій базі знань — "

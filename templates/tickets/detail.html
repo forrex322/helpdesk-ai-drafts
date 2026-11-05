@@ -13,9 +13,13 @@
     {% if ticket.last_error %}<tr><th>Остання помилка</th><td class="error">{{ ticket.last_error }}</td></tr>{% endif %}
   </table>
 
+  <div class="columns">
+  <section>
   <h2>Повідомлення клієнта</h2>
   <pre>{{ ticket.message }}</pre>
+  </section>
 
+  <section>
   {% if ticket.status == "draft_ready" %}
     <h2>Чернетка</h2>
     {% if llm_stub_mode %}<p class="messages">LLM працює в демо-режимі без API-ключа: запит до провайдера виконується, але чернетка статична.</p>{% endif %}
@@ -41,7 +45,7 @@
   {% if ticket.moderated_by %}
     <p class="muted">Модерував: {{ ticket.moderated_by.username }}, {{ ticket.moderated_at|date:"d.m.Y H:i:s" }}</p>
   {% endif %}
-  {% if ticket.status == "draft_failed" or ticket.status == "send_failed" %}
+  {% if ticket.can_retry %}
     <form method="post" action="{% url 'tickets:retry' ticket.pk %}">
       {% csrf_token %}
       <button type="submit">Повторити</button>
@@ -56,4 +60,6 @@
       <li class="muted">Немає.</li>
     {% endfor %}
   </ul>
+  </section>
+  </div>
 {% endblock %}

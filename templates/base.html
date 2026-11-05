@@ -17,6 +17,8 @@
     .muted { color: #666; }
     .status { white-space: nowrap; }
     .error { color: #b00020; }
+    .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    @media (max-width: 800px) { .columns { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>

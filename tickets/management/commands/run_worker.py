@@ -7,7 +7,8 @@ from django.core.management.base import BaseCommand
 from django.db import close_old_connections, connection
 
 from tickets.llm import draft_writer_from_settings
-from tickets.worker import Worker
+from tickets.rate_limit import llm_rate_limiter_from_settings
+from tickets.worker import ShuttingDown, Worker
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,14 @@ class Command(BaseCommand):
         signal.signal(signal.SIGTERM, lambda *_: stop.set())
         signal.signal(signal.SIGINT, lambda *_: stop.set())
 
-        worker = Worker(draft_writer=draft_writer_from_settings())
+        def sleep_unless_stopping(seconds):
+            if stop.wait(seconds):
+                raise ShuttingDown
+
+        worker = Worker(
+            draft_writer=draft_writer_from_settings(),
+            rate_limiter=llm_rate_limiter_from_settings(sleep=sleep_unless_stopping),
+        )
 
         def loop():
             try:
@@ -32,6 +40,8 @@ class Command(BaseCommand):
                     close_old_connections()
                     try:
                         did_work = worker.run_once()
+                    except ShuttingDown:
+                        break
                     except Exception:
                         logger.exception("Worker step failed")
                         did_work = False
@@ -43,11 +53,11 @@ class Command(BaseCommand):
         pool = [threading.Thread(target=loop, name=f"worker-{i}") for i in range(threads)]
         for thread in pool:
             thread.start()
-        mode = "stub (no ANTHROPIC_API_KEY)" if not settings.ANTHROPIC_API_KEY else settings.LLM_MODEL
+        mode = "stub (no ANTHROPIC_API_KEY)" if settings.LLM_STUB_MODE else settings.LLM_MODEL
         logger.info("Worker started: %s threads, LLM: %s", threads, mode)
 
         stop.wait()
-        logger.info("Stopping: letting in-flight Tickets finish (unfinished leases expire and are retried)")
+        logger.info("Stopping: in-flight calls finish, Tickets waiting for an LLM slot go back to the queue")
         for thread in pool:
             thread.join()
         logger.info("Worker stopped")

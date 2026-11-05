@@ -22,6 +22,7 @@ services:
       - path: .env
         required: false
     environment:
+      SECRET_KEY: dev-only-not-for-production
       DATABASE_URL: postgres://helpdesk:helpdesk@db:5432/helpdesk
       PUBLIC_BASE_URL: http://localhost:8000
       SIMULATOR_REPLY_BASE_URL: http://web:8000
@@ -35,12 +36,13 @@ services:
   worker:
     build: .
     command: ./bin/worker
-    # Let in-flight LLM calls (up to 30 s) finish on `docker compose stop`.
-    stop_grace_period: 45s
+    # Let in-flight LLM calls (up to LLM_TIMEOUT_SECONDS) finish on `docker compose stop`.
+    stop_grace_period: 75s
     env_file:
       - path: .env
         required: false
     environment:
+      SECRET_KEY: dev-only-not-for-production
       DATABASE_URL: postgres://helpdesk:helpdesk@db:5432/helpdesk
       PUBLIC_BASE_URL: http://localhost:8000
     depends_on:

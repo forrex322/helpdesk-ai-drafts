@@ -1,23 +1,25 @@
 import threading
 
+import httpx
 import pytest
 from django.db import connection
 from django.test import Client
 
-from tests.conftest import FakeDraftWriter, make_event, post_event, ticket_page
-from tickets.models import Ticket
-from tickets.worker import Worker
+from tests.conftest import FakeDraftWriter, make_event, post_event, ticket_page, ticket_path
+from tickets.helpdesk import HelpdeskClient
+from tickets.worker import DRAFT_MAX_ATTEMPTS, Worker
 
 
-def ticket_url(event_id="evt_8f2a"):
-    return f"/tickets/{Ticket.objects.get(event_id=event_id).pk}"
+class RejectingHelpdesk(httpx.BaseTransport):
+    def handle_request(self, request):
+        return httpx.Response(422)
 
 
 @pytest.fixture
 def drafted_ticket(db, client, clock):
     post_event(client, make_event())
     Worker(draft_writer=FakeDraftWriter(), now=clock).run_once()
-    return ticket_url()
+    return ticket_path()
 
 
 def test_operator_approves_an_edited_draft(operator_client, drafted_ticket):
@@ -59,7 +61,7 @@ def test_rejected_ticket_cannot_be_approved(operator_client, drafted_ticket):
 def test_ticket_without_a_draft_cannot_be_approved(db, client, operator_client):
     post_event(client, make_event())
 
-    page = operator_client.post(f"{ticket_url()}/approve", {"reply": "Текст"}, follow=True).content.decode()
+    page = operator_client.post(f"{ticket_path()}/approve", {"reply": "Текст"}, follow=True).content.decode()
 
     assert "вже оброблено" in page
     assert "Нове" in page
@@ -80,18 +82,25 @@ def test_moderation_requires_login_and_post(drafted_ticket, operator_client):
 
 def test_operator_retries_a_ticket_whose_drafting_failed(db, client, operator_client, clock):
     post_event(client, make_event())
-    Ticket.objects.update(status=Ticket.Status.DRAFT_FAILED, last_error="LLM is down")
+    failing = Worker(draft_writer=FakeDraftWriter(fail_times=100), now=clock)
+    for _ in range(DRAFT_MAX_ATTEMPTS):
+        failing.run_once()
+        clock.advance(minutes=10)
+    assert "Помилка генерації" in ticket_page(operator_client)
 
-    page = operator_client.post(f"{ticket_url()}/retry", follow=True).content.decode()
+    page = operator_client.post(f"{ticket_path()}/retry", follow=True).content.decode()
 
     assert "Нове" in page
+    clock.advance(seconds=1)
     assert Worker(draft_writer=FakeDraftWriter(), now=clock).run_once() is True
-    assert "Чекає модерації" in ticket_page(operator_client, "evt_8f2a")
+    assert "Чекає модерації" in ticket_page(operator_client)
 
 
-def test_operator_retries_a_ticket_whose_delivery_failed(operator_client, drafted_ticket):
+def test_operator_retries_a_ticket_whose_delivery_failed(operator_client, drafted_ticket, clock):
     operator_client.post(f"{drafted_ticket}/approve", {"reply": "Текст"})
-    Ticket.objects.update(status=Ticket.Status.SEND_FAILED, last_error="HTTP 503")
+    clock.advance(seconds=1)
+    Worker(draft_writer=FakeDraftWriter(), now=clock, helpdesk=HelpdeskClient(timeout=10, transport=RejectingHelpdesk())).run_once()
+    assert "Помилка надсилання" in ticket_page(operator_client)
 
     page = operator_client.post(f"{drafted_ticket}/retry", follow=True).content.decode()
 
@@ -103,7 +112,7 @@ def test_two_operators_approving_at_once_produce_one_reply(django_user_model):
     seed = Client()
     post_event(seed, make_event())
     Worker(draft_writer=FakeDraftWriter()).run_once()
-    url = ticket_url()
+    url = ticket_path()
     operators = [django_user_model.objects.create_user(username=f"op{i}", password="x") for i in range(8)]
     barrier = threading.Barrier(len(operators))
     outcomes = []
