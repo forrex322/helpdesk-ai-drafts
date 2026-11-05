@@ -11,7 +11,7 @@ Django service: Helpdesk webhook â†’ LLM Draft grounded in the Knowledge Base â†
 ## Tests
 
 - Postgres is required (no SQLite: we rely on `SKIP LOCKED`, advisory locks, `pg_trgm`): `docker compose up -d db`, then `.venv/bin/pytest`.
-- Test at the agreed seams only: HTTP (Django test client), one worker step `Worker.run_once()`, and the LLM / Helpdesk adapters with faked transports. Assert what an Operator, the Helpdesk or a Customer would see (pages, HTTP responses, the mock Helpdesk page), not rows.
+- Test at the agreed seams only: HTTP (Django test client), one worker step `Worker.run_once()`, the LLM / Helpdesk adapters with faked transports, and the global LLM rate limiter (`SlidingWindowRateLimiter.try_acquire()`, for guarantees across replicas that one `run_once()` cannot show). Assert what an Operator, the Helpdesk or a Customer would see (pages, HTTP responses, the mock Helpdesk page), not rows.
 - Time is injected: pass `FakeClock` (`tests/conftest.py`) as the worker's `now`. It starts at the real time of first use; advance it after actions that stamp real time (webhook, Approval).
 - Route in-process HTTP through Django's test `Client` (see `HelpdeskNetwork` in `tests/test_delivery.py`); calling the WSGI app directly closes the test's DB connection.
 - Threaded tests need `@pytest.mark.django_db(transaction=True)` and `connection.close()` at the end of each thread.

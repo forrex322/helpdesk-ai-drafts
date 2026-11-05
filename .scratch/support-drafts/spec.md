@@ -79,7 +79,7 @@ It runs with `docker compose up`, works without an LLM API key (stub mode), and 
 ## Testing Decisions
 
 - Good tests exercise external behaviour through the highest seam: HTTP requests through Django's test client, a single `run_once()` worker step, management commands. They assert on what an outsider sees (HTTP responses, Ticket status as shown to Operators, what the mock Helpdesk received), not on internal calls.
-- Seams (agreed): (1) the HTTP boundary of the service, (2) the worker's `run_once()`, (3) the LLM and Helpdesk adapters, replaced by fakes in tests (a fake LLM implementing the interface; an `httpx.MockTransport` for the Helpdesk). The clock is passed in where time decisions are made.
+- Seams (agreed): (1) the HTTP boundary of the service, (2) the worker's `run_once()`, (3) the LLM and Helpdesk adapters, replaced by fakes in tests (a fake LLM implementing the interface; an `httpx.MockTransport` for the Helpdesk), (4) the global LLM rate limiter's `try_acquire()`, added after code review because its cross-replica guarantee (separate limiters sharing one budget, concurrent callers never exceeding it) cannot be observed through a single `run_once()`. The clock is passed in where time decisions are made.
 - Tests run under pytest + pytest-django against real PostgreSQL (from docker compose), because `ON CONFLICT`, `SKIP LOCKED`, advisory locks and `pg_trgm` are what we rely on.
 - Concurrency behaviour (concurrent duplicate Events, competing workers) is tested with real threads against the real database using transactional test cases.
 - No prior art in the codebase; this spec establishes it.
