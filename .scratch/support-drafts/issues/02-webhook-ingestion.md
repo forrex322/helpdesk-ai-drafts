@@ -4,10 +4,10 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Valid Event → `200 {"status": "accepted"}` and a `new` Ticket
-- [ ] Same `event_id` again (also concurrently from many threads) → `200 {"status": "duplicate"}`, still one Ticket
-- [ ] Malformed JSON / missing fields / bad email / non-http reply_url → `400` with errors, nothing stored
-- [ ] `/tickets/` requires login; lists Tickets newest first with status; filter by status
-- [ ] Demo Operator created from `OPERATOR_USERNAME`/`OPERATOR_PASSWORD` by a startup command
+- [x] Valid Event → `200 {"status": "accepted"}` and a `new` Ticket
+- [x] Same `event_id` again (also concurrently from many threads) → `200 {"status": "duplicate"}`, still one Ticket
+- [x] Malformed JSON / missing fields / bad email / non-http reply_url → `400` with errors, nothing stored
+- [x] `/tickets/` requires login; lists Tickets newest first with status; filter by status
+- [x] Demo Operator created from `OPERATOR_USERNAME`/`OPERATOR_PASSWORD` by a startup command

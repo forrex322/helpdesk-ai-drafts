@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Звернення · Звітник{% endblock %}
+{% block head %}<meta http-equiv="refresh" content="15">{% endblock %}
+{% block content %}
+  <h1>Звернення</h1>
+  <form method="get">
+    <label>Статус
+      <select name="status" onchange="this.form.submit()">
+        <option value="">усі</option>
+        {% for value, label in statuses %}
+          <option value="{{ value }}" {% if value == status %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </form>
+  <table>
+    <thead><tr><th>Тікет</th><th>Клієнт</th><th>Повідомлення</th><th>Статус</th><th>Отримано</th></tr></thead>
+    <tbody>
+      {% for ticket in page %}
+        <tr data-event-id="{{ ticket.event_id }}">
+          <td>{{ ticket.helpdesk_ticket_id }}</td>
+          <td>{{ ticket.customer_email }}</td>
+          <td>{{ ticket.message|truncatechars:120 }}</td>
+          <td class="status">{{ ticket.get_status_display }}</td>
+          <td class="muted">{{ ticket.created_at|date:"d.m.Y H:i:s" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="muted">Звернень немає.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if page.has_other_pages %}
+    <p>
+      {% if page.has_previous %}<a href="?status={{ status }}&page={{ page.previous_page_number }}">← новіші</a>{% endif %}
+      сторінка {{ page.number }} з {{ page.paginator.num_pages }}
+      {% if page.has_next %}<a href="?status={{ status }}&page={{ page.next_page_number }}">старіші →</a>{% endif %}
+    </p>
+  {% endif %}
+{% endblock %}

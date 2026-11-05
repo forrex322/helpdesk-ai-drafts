@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Звітник · Підтримка{% endblock %}</title>
+  {% block head %}{% endblock %}
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0 auto; max-width: 1100px; padding: 0 16px 40px; line-height: 1.45; }
+    nav { display: flex; gap: 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid #ccc; margin-bottom: 16px; }
+    nav form { margin-left: auto; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border-bottom: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top; }
+    textarea { width: 100%; min-height: 260px; font: inherit; }
+    pre { white-space: pre-wrap; background: #f5f5f5; padding: 8px; }
+    .messages { padding: 8px 12px; background: #fff6d5; border: 1px solid #e5c100; }
+    .muted { color: #666; }
+    .status { white-space: nowrap; }
+    .error { color: #b00020; }
+  </style>
+</head>
+<body>
+  <nav>
+    <strong>Звітник · Підтримка</strong>
+    {% if user.is_authenticated %}
+      <a href="{% url 'tickets:list' %}">Звернення</a>
+    {% endif %}
+    {% block nav_extra %}{% endblock %}
+    {% if user.is_authenticated %}
+      <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button>Вийти ({{ user.username }})</button></form>
+    {% endif %}
+  </nav>
+  {% if messages %}
+    {% for message in messages %}<p class="messages">{{ message }}</p>{% endfor %}
+  {% endif %}
+  {% block content %}{% endblock %}
+</body>
+</html>
