@@ -24,6 +24,7 @@ services:
     environment:
       DATABASE_URL: postgres://helpdesk:helpdesk@db:5432/helpdesk
       PUBLIC_BASE_URL: http://localhost:8000
+      SIMULATOR_REPLY_BASE_URL: http://web:8000
       ALLOWED_HOSTS: "*"
     ports:
       - "8000:8000"

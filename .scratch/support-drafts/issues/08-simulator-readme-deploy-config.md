@@ -4,9 +4,9 @@
 
 **Blocked by:** 07
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `simulate_webhooks --count 500 --duplicate-rate 0.3 --concurrency 20` works locally and against the deployment
-- [ ] README: architecture, run with docker compose, env vars, tests, simulator, deployment, design decisions
-- [ ] Railway config for web and worker
-- [ ] CLAUDE.md committed
+- [x] `simulate_webhooks --count 500 --duplicate-rate 0.3 --concurrency 20` works locally and against the deployment
+- [x] README: architecture, run with docker compose, env vars, tests, simulator, deployment, design decisions
+- [x] Railway config for web and worker
+- [x] CLAUDE.md committed

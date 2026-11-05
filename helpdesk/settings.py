@@ -168,6 +168,10 @@ WORKER_THREADS = int(os.environ.get("WORKER_THREADS", "30"))
 # Helpdesk client.
 HELPDESK_TIMEOUT_SECONDS = float(os.environ.get("HELPDESK_TIMEOUT_SECONDS", "10"))
 
+# Where `simulate_webhooks` tells the Helpdesk to receive Replies (the mock
+# Helpdesk), as reachable from the worker.
+SIMULATOR_REPLY_BASE_URL = os.environ.get("SIMULATOR_REPLY_BASE_URL", PUBLIC_BASE_URL)
+
 # Mock Helpdesk fault injection.
 MOCK_HELPDESK_FAILURE_RATE = float(os.environ.get("MOCK_HELPDESK_FAILURE_RATE", "0.2"))
 MOCK_HELPDESK_SLOW_RATE = float(os.environ.get("MOCK_HELPDESK_SLOW_RATE", "0.1"))
