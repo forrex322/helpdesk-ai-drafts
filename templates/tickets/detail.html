@@ -15,12 +15,36 @@
   <h2>Повідомлення клієнта</h2>
   <pre>{{ ticket.message }}</pre>
 
-  <h2>Чернетка</h2>
-  {% if llm_stub_mode %}<p class="messages">LLM працює в демо-режимі без API-ключа: запит до провайдера виконується, але чернетка статична.</p>{% endif %}
-  {% if ticket.draft %}
+  {% if ticket.status == "draft_ready" %}
+    <h2>Чернетка</h2>
+    {% if llm_stub_mode %}<p class="messages">LLM працює в демо-режимі без API-ключа: запит до провайдера виконується, але чернетка статична.</p>{% endif %}
+    <form method="post">
+      {% csrf_token %}
+      <p class="muted">Можна відредагувати текст перед підтвердженням.</p>
+      <textarea name="reply">{{ ticket.draft }}</textarea>
+      <p>
+        <button type="submit" formaction="{% url 'tickets:approve' ticket.pk %}">Підтвердити й надіслати</button>
+        <button type="submit" formaction="{% url 'tickets:reject' ticket.pk %}">Відхилити</button>
+      </p>
+    </form>
+  {% elif ticket.reply %}
+    <h2>Відповідь</h2>
+    <pre>{{ ticket.reply }}</pre>
+  {% elif ticket.draft %}
+    <h2>Чернетка</h2>
     <pre>{{ ticket.draft }}</pre>
   {% else %}
+    <h2>Чернетка</h2>
     <p class="muted">Чернетки ще немає.</p>
+  {% endif %}
+  {% if ticket.moderated_by %}
+    <p class="muted">Модерував: {{ ticket.moderated_by.username }}, {{ ticket.moderated_at|date:"d.m.Y H:i:s" }}</p>
+  {% endif %}
+  {% if ticket.status == "draft_failed" or ticket.status == "send_failed" %}
+    <form method="post" action="{% url 'tickets:retry' ticket.pk %}">
+      {% csrf_token %}
+      <button type="submit">Повторити</button>
+    </form>
   {% endif %}
 
   <h2>Знайдені статті</h2>
