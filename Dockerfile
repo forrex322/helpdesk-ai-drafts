@@ -7,8 +7,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY requirements.txt requirements-dev.txt ./
-RUN pip install -r requirements-dev.txt
+COPY requirements/ requirements/
+RUN pip install -r requirements/dev.txt
 
 COPY . .
 RUN SECRET_KEY=build python manage.py collectstatic --noinput

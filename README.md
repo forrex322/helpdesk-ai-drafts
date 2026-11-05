@@ -142,8 +142,8 @@ webhook latency, s:       p50 0.039  p95 0.144  max 0.547
 
 ```bash
 docker compose up -d db
-python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest            # налаштування: helpdesk/test_settings.py
+python -m venv .venv && .venv/bin/pip install -r requirements/dev.txt
+.venv/bin/pytest            # налаштування: config/test_settings.py
 ```
 
 Або в контейнері: `docker compose run --rm web pytest`.
@@ -182,12 +182,25 @@ python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 ## Структура
 
 ```text
-helpdesk/         налаштування, URL-и
-tickets/          звернення: вебхук, воркер (черга, lease, ретраї), модерація, адаптери LLM і хелпдеску, rate limit, UI оператора
-knowledge_base/   статті (засіваються міграцією), пошук pg_trgm, публічні сторінки /kb/
-mock_helpdesk/    мок API відповідей хелпдеску зі збоями, сторінка отриманих відповідей, симулятор вебхуків
-tests/            pytest
-bin/web, bin/worker  команди запуску контейнера
+apps/
+├── tickets/                 звернення від вебхука до надісланої відповіді
+│   ├── views.py, forms.py   вебхук і UI оператора
+│   ├── worker.py            черга в Postgres: claim, lease, ретраї, генерація, надсилання
+│   ├── rate_limit.py        глобальний ліміт викликів LLM
+│   ├── moderation.py        підтвердити / відхилити / повторити
+│   ├── adapters/            зовнішні системи: llm.py (Anthropic), helpdesk.py (API хелпдеску)
+│   ├── management/commands/ run_worker, ensure_operator
+│   └── templates/tickets/
+├── knowledge_base/          статті (засіваються міграцією), пошук pg_trgm, сторінки /kb/
+└── mock_helpdesk/           мок API хелпдеску зі збоями, сторінка отриманих відповідей, simulate_webhooks
+config/                      Django-проєкт: settings, test_settings, urls, wsgi
+templates/                   спільні шаблони: base.html, сторінка входу
+tests/                       pytest, згруповано за застосунками (tickets/, knowledge_base/, mock_helpdesk/)
+requirements/                base.txt (runtime), dev.txt (+ тести)
+bin/                         команди контейнера: web, worker
+docs/                        adr/ (рішення), agents/ (як скіли агента працюють з репо)
+.scratch/support-drafts/     специфікація і тікети
+.agents/skills/              скіли агента (Matt Pocock)
 ```
 
 ## Як я працював з агентом
