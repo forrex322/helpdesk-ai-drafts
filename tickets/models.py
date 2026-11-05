@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -32,6 +33,13 @@ class Ticket(models.Model):
 
     draft = models.TextField(blank=True)
     cited_articles = models.ManyToManyField("knowledge_base.Article", blank=True, related_name="+")
+
+    # Set by the Operator's Approval (the Reply is the approved, possibly edited, Draft) or Rejection.
+    reply = models.TextField(blank=True)
+    moderated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    moderated_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
