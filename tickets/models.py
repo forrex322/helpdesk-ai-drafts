@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 
 class Ticket(models.Model):
@@ -21,11 +22,29 @@ class Ticket(models.Model):
     message = models.TextField()
     reply_url = models.URLField(max_length=2048)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.NEW)
+
+    # Job-queue fields (ADR-0001). For due statuses `available_at` is the next
+    # attempt time; for in-flight statuses it is when the worker's lease expires.
+    available_at = models.DateTimeField(default=timezone.now)
+    lease_id = models.UUIDField(null=True, blank=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_error = models.TextField(blank=True)
+
+    draft = models.TextField(blank=True)
+    cited_articles = models.ManyToManyField("knowledge_base.Article", blank=True, related_name="+")
+
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(
+                fields=["available_at"],
+                name="ticket_due_work_idx",
+                condition=models.Q(status__in=["new", "drafting", "approved", "sending"]),
+            ),
+        ]
 
     def __str__(self):
         return f"{self.helpdesk_ticket_id} ({self.event_id})"

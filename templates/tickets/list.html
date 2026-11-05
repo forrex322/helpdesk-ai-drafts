@@ -18,7 +18,7 @@
     <tbody>
       {% for ticket in page %}
         <tr data-event-id="{{ ticket.event_id }}">
-          <td>{{ ticket.helpdesk_ticket_id }}</td>
+          <td><a href="{% url 'tickets:detail' ticket.pk %}">{{ ticket.helpdesk_ticket_id }}</a></td>
           <td>{{ ticket.customer_email }}</td>
           <td>{{ ticket.message|truncatechars:120 }}</td>
           <td class="status">{{ ticket.get_status_display }}</td>

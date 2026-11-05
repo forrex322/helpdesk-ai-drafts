@@ -4,11 +4,11 @@
 
 **Blocked by:** 02, 03
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `run_once()` claims one due Ticket (`SKIP LOCKED`, lease, fencing `lease_id`) and drafts it → `draft_ready`
-- [ ] Two workers never draft the same Ticket at once; an expired lease is reclaimed; a stale worker cannot overwrite
-- [ ] LLM failure → back to `new` with backoff and `last_error`; after 5 attempts → `draft_failed`
-- [ ] Anthropic adapter with SDK retries off; stub mode makes the real request, then returns a static Draft with Article links after a total of 5–30 s
-- [ ] `run_worker` command runs N threads and stops gracefully on SIGTERM
-- [ ] Ticket detail page shows message, Draft and cited Articles
+- [x] `run_once()` claims one due Ticket (`SKIP LOCKED`, lease, fencing `lease_id`) and drafts it → `draft_ready`
+- [x] Two workers never draft the same Ticket at once; an expired lease is reclaimed; a stale worker cannot overwrite
+- [x] LLM failure → back to `new` with backoff and `last_error`; after 5 attempts → `draft_failed`
+- [x] Anthropic adapter with SDK retries off; stub mode makes the real request, then returns a static Draft with Article links after a total of 5–30 s
+- [x] `run_worker` command runs N threads and stops gracefully on SIGTERM
+- [x] Ticket detail page shows message, Draft and cited Articles
