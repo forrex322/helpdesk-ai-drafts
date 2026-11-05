@@ -3,12 +3,6 @@ import json
 import pytest
 
 
-@pytest.fixture
-def reliable_helpdesk(settings):
-    settings.MOCK_HELPDESK_FAILURE_RATE = 0
-    settings.MOCK_HELPDESK_SLOW_RATE = 0
-
-
 def post_reply(client, ticket_id="T-1042", message="Відповідь", key="key-1", body=None):
     headers = {"HTTP_IDEMPOTENCY_KEY": key} if key else {}
     return client.post(
@@ -19,7 +13,7 @@ def post_reply(client, ticket_id="T-1042", message="Відповідь", key="ke
     )
 
 
-def test_accepts_a_reply_and_shows_what_the_customer_received(db, client, reliable_helpdesk):
+def test_accepts_a_reply_and_shows_what_the_customer_received(db, client, reliable_mock_helpdesk):
     response = post_reply(client, message="Щоб експортувати звіт у PDF, відкрийте...")
 
     assert response.status_code == 201
@@ -28,7 +22,7 @@ def test_accepts_a_reply_and_shows_what_the_customer_received(db, client, reliab
     assert "Щоб експортувати звіт у PDF, відкрийте..." in page
 
 
-def test_repeated_idempotency_key_is_acknowledged_but_not_received_twice(db, client, reliable_helpdesk):
+def test_repeated_idempotency_key_is_acknowledged_but_not_received_twice(db, client, reliable_mock_helpdesk):
     post_reply(client, message="Одна відповідь", key="same-key")
 
     response = post_reply(client, message="Одна відповідь", key="same-key")
@@ -59,5 +53,5 @@ def test_slow_helpdesk_stores_the_reply_before_answering_late(db, client, settin
     assert "Повільна відповідь" in client.get("/mock-helpdesk/").content.decode()
 
 
-def test_malformed_reply_is_rejected(db, client, reliable_helpdesk):
+def test_malformed_reply_is_rejected(db, client, reliable_mock_helpdesk):
     assert post_reply(client, body={"message": ""}).status_code == 400

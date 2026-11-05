@@ -5,23 +5,42 @@ from django.db import models
 from django.utils import timezone
 
 
+class Status(models.TextChoices):
+    NEW = "new", "Нове"
+    DRAFTING = "drafting", "Генерується чернетка"
+    DRAFT_READY = "draft_ready", "Чекає модерації"
+    DRAFT_FAILED = "draft_failed", "Помилка генерації"
+    APPROVED = "approved", "Підтверджено, в черзі"
+    SENDING = "sending", "Надсилається"
+    SENT = "sent", "Надіслано"
+    SEND_FAILED = "send_failed", "Помилка надсилання"
+    REJECTED = "rejected", "Відхилено"
+
+
+# Queued status -> the in-flight status a claimed Ticket takes (ADR-0001). In-flight
+# statuses are claimable too: that is how an expired lease gets picked up again.
+CLAIMS = {
+    Status.NEW: Status.DRAFTING,
+    Status.DRAFTING: Status.DRAFTING,
+    Status.APPROVED: Status.SENDING,
+    Status.SENDING: Status.SENDING,
+}
+
+# Status where drafting or Delivery gave up -> where an Operator's retry sends the Ticket.
+RETRIES = {
+    Status.DRAFT_FAILED: Status.NEW,
+    Status.SEND_FAILED: Status.APPROVED,
+}
+
+
 class Ticket(models.Model):
     """A Customer's support request, created from exactly one Helpdesk Event."""
 
-    class Status(models.TextChoices):
-        NEW = "new", "Нове"
-        DRAFTING = "drafting", "Генерується чернетка"
-        DRAFT_READY = "draft_ready", "Чекає модерації"
-        DRAFT_FAILED = "draft_failed", "Помилка генерації"
-        APPROVED = "approved", "Підтверджено, в черзі"
-        SENDING = "sending", "Надсилається"
-        SENT = "sent", "Надіслано"
-        SEND_FAILED = "send_failed", "Помилка надсилання"
-        REJECTED = "rejected", "Відхилено"
+    Status = Status
 
     event_id = models.CharField(max_length=255, unique=True)
     helpdesk_ticket_id = models.CharField(max_length=255, db_index=True)
-    customer_email = models.EmailField(max_length=254)
+    customer_email = models.CharField(max_length=254, blank=True)
     message = models.TextField()
     reply_url = models.URLField(max_length=2048)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.NEW)
@@ -56,19 +75,19 @@ class Ticket(models.Model):
             models.Index(
                 fields=["available_at"],
                 name="ticket_due_work_idx",
-                condition=models.Q(status__in=["new", "drafting", "approved", "sending"]),
+                condition=models.Q(status__in=[status.value for status in CLAIMS]),
             ),
         ]
 
     def __str__(self):
         return f"{self.helpdesk_ticket_id} ({self.event_id})"
 
+    @property
+    def can_retry(self):
+        return self.status in RETRIES
+
 
 class RateLimitHit(models.Model):
-    """One call start recorded by the sliding-window rate limiter (ADR-0003)."""
+    """One LLM call start recorded by the sliding-window rate limiter (ADR-0003)."""
 
-    bucket = models.CharField(max_length=50)
-    at = models.DateTimeField()
-
-    class Meta:
-        indexes = [models.Index(fields=["bucket", "at"], name="ratelimit_bucket_at_idx")]
+    at = models.DateTimeField(db_index=True)

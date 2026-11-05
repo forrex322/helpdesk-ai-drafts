@@ -19,12 +19,10 @@ from knowledge_base.search import search_articles
 
 from .helpdesk import HelpdeskClient, PermanentDeliveryError, RetryableDeliveryError, helpdesk_client_from_settings
 from .llm import DraftWriter
-from .models import Ticket
+from .models import CLAIMS, Status, Ticket
 from .rate_limit import SlidingWindowRateLimiter, llm_rate_limiter_from_settings
 
 logger = logging.getLogger(__name__)
-
-S = Ticket.Status
 
 LEASE = timedelta(minutes=5)
 DRAFT_MAX_ATTEMPTS = 5
@@ -32,18 +30,21 @@ DELIVERY_MAX_ATTEMPTS = 8
 BACKOFF_BASE = timedelta(seconds=10)
 BACKOFF_MAX = timedelta(minutes=10)
 
-# Due status -> the in-flight status a claimed Ticket takes. In-flight statuses
-# are claimable too: that is how an expired lease gets picked up again.
-CLAIMABLE = {
-    S.NEW: S.DRAFTING,
-    S.DRAFTING: S.DRAFTING,
-    S.APPROVED: S.SENDING,
-    S.SENDING: S.SENDING,
-}
+
+class ShuttingDown(Exception):
+    """Raised from a wait when the worker process is asked to stop."""
+
+
+class LeaseLost(Exception):
+    """Another worker took the Ticket over; this worker must stop touching it."""
 
 
 def backoff(attempt):
     return min(BACKOFF_BASE * 2 ** (attempt - 1), BACKOFF_MAX)
+
+
+def describe(error):
+    return f"{type(error).__name__}: {error}"
 
 
 @dataclass
@@ -58,7 +59,7 @@ class Worker:
         ticket = self._claim()
         if ticket is None:
             return False
-        if ticket.status == S.DRAFTING:
+        if ticket.status == Status.DRAFTING:
             self._draft(ticket)
         else:
             self._deliver(ticket)
@@ -69,13 +70,13 @@ class Worker:
         with transaction.atomic():
             ticket = (
                 Ticket.objects.select_for_update(skip_locked=True)
-                .filter(status__in=list(CLAIMABLE), available_at__lte=now)
+                .filter(status__in=list(CLAIMS), available_at__lte=now)
                 .order_by("available_at")
                 .first()
             )
             if ticket is None:
                 return None
-            ticket.status = CLAIMABLE[ticket.status]
+            ticket.status = CLAIMS[ticket.status]
             ticket.lease_id = uuid.uuid4()
             ticket.available_at = now + LEASE
             ticket.attempts += 1
@@ -85,14 +86,21 @@ class Worker:
     def _draft(self, ticket):
         try:
             articles = search_articles(ticket.message)
-            self.rate_limiter.acquire()
+            # Waiting for a slot can outlast the lease under a backlog, so keep renewing it.
+            self.rate_limiter.acquire(on_wait=lambda: self._renew_lease(ticket))
             draft = self.draft_writer.write_draft(ticket.message, articles)
+        except ShuttingDown:
+            self._complete(ticket, status=Status.NEW, available_at=self.now(), attempts=ticket.attempts - 1)
+            raise
+        except LeaseLost:
+            logger.warning("Lost the lease on %s while waiting for an LLM slot", ticket)
+            return
         except Exception as error:
             logger.warning("Drafting %s failed (attempt %s): %r", ticket, ticket.attempts, error)
-            self._retry_or_fail(ticket, error, DRAFT_MAX_ATTEMPTS, retry_as=S.NEW, fail_as=S.DRAFT_FAILED)
+            self._retry_or_fail(ticket, error, DRAFT_MAX_ATTEMPTS, retry_as=Status.NEW, fail_as=Status.DRAFT_FAILED)
             return
         with transaction.atomic():
-            if self._complete(ticket, status=S.DRAFT_READY, draft=draft, last_error=""):
+            if self._complete(ticket, status=Status.DRAFT_READY, draft=draft, last_error=""):
                 ticket.cited_articles.set(articles)
         logger.info("Drafted %s citing %s", ticket, [article.slug for article in articles])
 
@@ -103,26 +111,32 @@ class Worker:
             )
         except RetryableDeliveryError as error:
             logger.warning("Delivery of %s failed (attempt %s): %s", ticket, ticket.attempts, error)
-            self._retry_or_fail(ticket, error, DELIVERY_MAX_ATTEMPTS, retry_as=S.APPROVED, fail_as=S.SEND_FAILED)
+            self._retry_or_fail(
+                ticket, error, DELIVERY_MAX_ATTEMPTS, retry_as=Status.APPROVED, fail_as=Status.SEND_FAILED
+            )
             return
         except PermanentDeliveryError as error:
             logger.warning("Helpdesk refused the Reply for %s: %s", ticket, error)
-            self._complete(ticket, status=S.SEND_FAILED, last_error=f"{type(error).__name__}: {error}")
+            self._complete(ticket, status=Status.SEND_FAILED, last_error=describe(error))
             return
-        self._complete(ticket, status=S.SENT, sent_at=timezone.now(), last_error="")
+        self._complete(ticket, status=Status.SENT, sent_at=self.now(), last_error="")
         logger.info("Delivered the Reply for %s", ticket)
 
     def _retry_or_fail(self, ticket, error, max_attempts, retry_as, fail_as):
-        last_error = f"{type(error).__name__}: {error}"
         if ticket.attempts >= max_attempts:
-            self._complete(ticket, status=fail_as, last_error=last_error)
+            self._complete(ticket, status=fail_as, last_error=describe(error))
         else:
             self._complete(
                 ticket,
                 status=retry_as,
                 available_at=self.now() + backoff(ticket.attempts),
-                last_error=last_error,
+                last_error=describe(error),
             )
+
+    def _renew_lease(self, ticket):
+        renewed = Ticket.objects.filter(pk=ticket.pk, lease_id=ticket.lease_id).update(available_at=self.now() + LEASE)
+        if not renewed:
+            raise LeaseLost
 
     def _complete(self, ticket, **fields) -> bool:
         """Apply the outcome only if this worker still holds the lease."""

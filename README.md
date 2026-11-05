@@ -21,7 +21,7 @@
 flowchart LR
     HD[Хелпдеск] -- "POST /webhooks/helpdesk" --> WEB
     subgraph Service
-      WEB[web: Django + gunicorn] -- "INSERT … ON CONFLICT (event_id)" --> PG[(PostgreSQL<br/>звернення = черга)]
+      WEB[web: Django + gunicorn] -- "unique event_id, get_or_create" --> PG[(PostgreSQL<br/>звернення = черга)]
       W[worker: 30 потоків] -- "claim: FOR UPDATE SKIP LOCKED + lease" --> PG
       W -- "pg_trgm пошук" --> KB[(Статті бази знань)]
       W -- "≤ 60 викликів/хв<br/>(sliding window у Postgres)" --> LLM[Anthropic Claude]
@@ -133,7 +133,8 @@ webhook latency, s:       p50 0.039  p95 0.144  max 0.547
 | `MOCK_HELPDESK_SLOW_RATE` | `0.1` | Частка «повільних» відповідей: мок зберігає відповідь, але відповідає пізніше за наш таймаут |
 | `MOCK_HELPDESK_SLOW_SECONDS` | `15` | Наскільки пізно |
 | `DATABASE_URL` | compose Postgres | Рядок підключення |
-| `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS` | — | Стандартні налаштування Django |
+| `SECRET_KEY` | — | Обов'язкова. Без неї сервіс не стартує, якщо не задано `DEBUG=1`. У compose задано dev-значення |
+| `DEBUG`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS` | — | Стандартні налаштування Django |
 
 ## Тести
 
@@ -142,15 +143,16 @@ webhook latency, s:       p50 0.039  p95 0.144  max 0.547
 ```bash
 docker compose up -d db
 python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest
+.venv/bin/pytest            # налаштування: helpdesk/test_settings.py
 ```
 
 Або в контейнері: `docker compose run --rm web pytest`.
 
-Тести перевіряють поведінку на трьох межах:
+Тести перевіряють поведінку на чотирьох межах:
 1. HTTP: вебхук, сторінки оператора, мок хелпдеску.
 2. Один крок воркера `Worker.run_once()` з фейковим годинником.
 3. Адаптери LLM і хелпдеску з підробленим HTTP-транспортом.
+4. Глобальний rate limiter LLM (`try_acquire()`): його гарантію для кількох реплік не видно через один крок воркера.
 
 Серед них є конкурентні тести на реальних потоках: одночасні дублі вебхука, кілька воркерів, кілька операторів, rate limit.
 
@@ -199,6 +201,11 @@ bin/web, bin/worker  команди запуску контейнера
 5. **`/code-review`**: рев'ю гілки за стандартами і за специфікацією.
 
 [`CLAUDE.md`](CLAUDE.md) містить інструкції для агента: словник, тести, інваріанти, workflow.
+
+## Обмеження демо
+
+- Мок хелпдеску працює в тому самому вебпроцесі, що й вебхук. Його «повільні» відповіді на 15 с займають потік gunicorn. Для демо цього достатньо (2 воркери × 16 потоків), але справжній хелпдеск — це окремий сервіс.
+- Exactly-once тримається на тому, що хелпдеск підтримує `Idempotency-Key` ([ADR-0002](docs/adr/0002-exactly-once-reply-via-idempotency-key.md)). Без цього відповідь можуть доставити двічі у двох випадках: якщо хелпдеск зберіг її, але не відповів вчасно, або якщо воркер упав між `201` і записом статусу `sent`.
 
 ## Що свідомо поза рамками
 

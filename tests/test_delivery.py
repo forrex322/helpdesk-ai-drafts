@@ -43,9 +43,8 @@ class HelpdeskNetwork(httpx.BaseTransport):
 
 
 @pytest.fixture(autouse=True)
-def reliable_mock_helpdesk(settings):
-    settings.MOCK_HELPDESK_FAILURE_RATE = 0
-    settings.MOCK_HELPDESK_SLOW_RATE = 0
+def _reliable(reliable_mock_helpdesk):
+    pass
 
 
 @pytest.fixture
@@ -57,8 +56,8 @@ def approved_ticket(db, client, operator_client, clock):
     clock.advance(seconds=1)  # the worker gets to it a moment after the Approval
 
 
-def delivering_worker(network, clock):
-    return Worker(draft_writer=FakeDraftWriter(), now=clock, helpdesk=HelpdeskClient(timeout=10, transport=network))
+def delivering_worker(transport, clock):
+    return Worker(draft_writer=FakeDraftWriter(), now=clock, helpdesk=HelpdeskClient(timeout=10, transport=transport))
 
 
 def received_by_customer(client):
@@ -124,7 +123,7 @@ def test_helpdesk_rejecting_the_reply_is_not_retried(approved_ticket, client, op
         def handle_request(self, request):
             return httpx.Response(422, json={"error": "ticket closed"})
 
-    worker = Worker(draft_writer=FakeDraftWriter(), now=clock, helpdesk=HelpdeskClient(timeout=10, transport=Rejecting()))
+    worker = delivering_worker(Rejecting(), clock)
 
     worker.run_once()
 
@@ -138,7 +137,7 @@ def test_unreachable_helpdesk_is_retried(approved_ticket, operator_client, clock
         def handle_request(self, request):
             raise httpx.ConnectError("connection refused", request=request)
 
-    worker = Worker(draft_writer=FakeDraftWriter(), now=clock, helpdesk=HelpdeskClient(timeout=10, transport=Down()))
+    worker = delivering_worker(Down(), clock)
 
     worker.run_once()
 

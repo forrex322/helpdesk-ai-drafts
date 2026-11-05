@@ -84,7 +84,6 @@ def test_malformed_body_is_rejected(db, client, operator_client, body):
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"customer_email": "not-an-email"},
         {"reply_url": "ftp://helpdesk.example.com/replies"},
         {"reply_url": "not a url"},
         {"message": ""},
@@ -96,6 +95,22 @@ def test_invalid_fields_are_rejected(db, client, operator_client, overrides):
 
     assert response.status_code == 400
     assert "data-event-id" not in operator_client.get("/tickets/").content.decode()
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"customer_email": "not-an-email"},
+        {"message": "   "},
+        {"message": "Не можу\x00 експортувати"},
+    ],
+    ids=["odd-email", "blank-message", "nul-character"],
+)
+def test_events_with_imperfect_fields_are_still_accepted_so_no_ticket_is_lost(db, client, operator_client, overrides):
+    response = post_event(client, make_event(**overrides))
+
+    assert response.status_code == 200
+    assert 'data-event-id="evt_8f2a"' in operator_client.get("/tickets/").content.decode()
 
 
 def test_reply_url_on_an_internal_host_is_accepted(db, client):

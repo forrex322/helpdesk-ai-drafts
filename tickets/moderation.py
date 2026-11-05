@@ -7,17 +7,15 @@ Every function returns False when the Ticket was not in that status anymore.
 
 from django.utils import timezone
 
-from .models import Ticket
-
-S = Ticket.Status
+from .models import RETRIES, Status, Ticket
 
 
-def approve(ticket_id, reply, operator) -> bool:
+def approve(pk, reply, operator) -> bool:
     now = timezone.now()
     return _transition(
-        ticket_id,
-        S.DRAFT_READY,
-        status=S.APPROVED,
+        pk,
+        Status.DRAFT_READY,
+        status=Status.APPROVED,
         reply=reply,
         moderated_by=operator,
         moderated_at=now,
@@ -27,19 +25,19 @@ def approve(ticket_id, reply, operator) -> bool:
     )
 
 
-def reject(ticket_id, operator) -> bool:
-    return _transition(ticket_id, S.DRAFT_READY, status=S.REJECTED, moderated_by=operator, moderated_at=timezone.now())
+def reject(pk, operator) -> bool:
+    return _transition(
+        pk, Status.DRAFT_READY, status=Status.REJECTED, moderated_by=operator, moderated_at=timezone.now()
+    )
 
 
-def retry(ticket_id) -> bool:
+def retry(pk) -> bool:
     """Send a Ticket whose drafting or Delivery gave up back into the queue."""
-    restart = {"available_at": timezone.now(), "attempts": 0}
-    return _transition(ticket_id, S.DRAFT_FAILED, status=S.NEW, **restart) or _transition(
-        ticket_id, S.SEND_FAILED, status=S.APPROVED, **restart
+    return any(
+        _transition(pk, failed, status=queued, available_at=timezone.now(), attempts=0)
+        for failed, queued in RETRIES.items()
     )
 
 
-def _transition(ticket_id, from_status, **fields) -> bool:
-    return bool(
-        Ticket.objects.filter(pk=ticket_id, status=from_status).update(updated_at=timezone.now(), **fields)
-    )
+def _transition(pk, from_status, **fields) -> bool:
+    return bool(Ticket.objects.filter(pk=pk, status=from_status).update(updated_at=timezone.now(), **fields))

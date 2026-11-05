@@ -10,7 +10,6 @@ class Command(BaseCommand):
         User = get_user_model()
         user, created = User.objects.get_or_create(username=settings.OPERATOR_USERNAME)
         user.set_password(settings.OPERATOR_PASSWORD)
-        user.is_staff = True
         user.save()
         verb = "Created" if created else "Updated"
         self.stdout.write(f"{verb} Operator '{user.username}'.")
